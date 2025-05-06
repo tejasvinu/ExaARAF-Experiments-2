@@ -411,6 +411,7 @@ fi
 module purge  # Start with a clean environment
 module load gnu8/8.3.0
 module load openmpi/4.1.4  # Updated to match available version
+module list
 {f'module load oneapi/mpi/latest' if compiler in ['icc', 'oneapi'] else ''}
 
 # Debug information
