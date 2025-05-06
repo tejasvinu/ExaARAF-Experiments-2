@@ -589,7 +589,8 @@ def main():
                              help="Number of MPI processes")    
     setup_parser.add_argument("--omp-threads", type=int, required=True, help="Number of OpenMP threads per process.")
     setup_parser.add_argument("--tracing", action="store_true", help="Enable execution tracing.")
-    setup_parser.add_argument("--nodes", type=int, default=1, help="Number of compute nodes to request.") # Added nodes argument
+    setup_parser.add_argument("--nodes", type=int, default=1, help="Number of compute nodes to request.")
+    setup_parser.add_argument("--cores-per-node", type=int, default=40, help="Number of CPU cores per compute node.") # Added cores-per-node
 
     # --- Generate Slurm Script Subcommand ---
     slurm_parser = subparsers.add_parser("generate-slurm", help="Generate Slurm script for an experiment")
@@ -613,6 +614,10 @@ def main():
                              help="Run ID of the experiment")
     submit_parser.add_argument("--time-limit", type=str, default="01:00:00",
                              help="Job time limit in HH:MM:SS format")
+    submit_parser.add_argument("--nodes", type=int, default=None,
+                             help="Number of nodes to request (overrides config)") # Added nodes
+    submit_parser.add_argument("--cores-per-node", type=int, default=40,
+                             help="Number of CPU cores per node (overrides config)") # Added cores-per-node
     
     # Parse arguments
     args = parser.parse_args()

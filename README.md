@@ -63,16 +63,17 @@ Where:
 ### Setting Up an Experiment
 
 ```bash
-python scripts/experiment_manager.py setup \
-    --problem problem_instances/sample_problem01.txt \
-    --simulations 50000 \
-    --exploration 1.414 \\ # Added exploration constant
-    --parallelization treeMPI \
-    --compiler oneapi \
-    --optimization O3xHost \
-    --processes 32 \
-    --omp-threads 4 \
-    --nodes 1 \
+python scripts/experiment_manager.py setup \\
+    --problem problem_instances/sample_problem01.txt \\
+    --simulations 50000 \\
+    --exploration 1.414 \\
+    --parallelization treeMPI \\
+    --compiler oneapi \\
+    --optimization O3xHost \\
+    --processes 32 \\
+    --omp-threads 4 \\
+    --nodes 1 \\
+    --cores-per-node 40 \\ # Added cores-per-node
     --tracing
 ```
 
@@ -97,9 +98,11 @@ This will:
 ### Submitting the Job
 
 ```bash
-python scripts/experiment_manager.py submit \
-    --run-id [run_id] \
-    --time-limit 04:00:00
+python scripts/experiment_manager.py submit \\
+    --run-id [run_id] \\
+    --time-limit 04:00:00 \\ # Optional: Override time limit
+    # --nodes 2 \\             # Optional: Override node count from config
+    # --cores-per-node 32 \\ # Optional: Override cores per node from config
 ```
 
 This will:
