@@ -406,7 +406,7 @@ echo "Build completed: {build_dir}/mcts_scheduler"
                              run_id: str, 
                              parallel_settings: Dict[str, Any],
                              time_limit: str = "01:00:00",
-                             cores_per_node: int = 48,  # Updated to 48 cores total
+                             cores_per_node: int = 48,  # Total cores per node
                              nodes: Optional[int] = None) -> str:
         """
         Generate a Slurm script for the experiment.
@@ -415,8 +415,8 @@ echo "Build completed: {build_dir}/mcts_scheduler"
             run_id: The experiment run ID
             parallel_settings: MPI and OpenMP settings
             time_limit: Job time limit in HH:MM:SS format
-            cores_per_node: Number of CPU cores per compute node (default 48 for 2×48)
-            nodes: Explicit number of nodes to request (overrides automatic calculation)
+            cores_per_node: Number of CPU cores per compute node
+            nodes: Explicit number of nodes to request
             
         Returns:
             Path to the generated Slurm script
@@ -430,22 +430,32 @@ echo "Build completed: {build_dir}/mcts_scheduler"
         
         # Extract settings
         processes = parallel_settings.get("processes", 1)
-        
-        # Calculate nodes required if not explicitly provided
-        if nodes is None:
-            nodes = (processes + cores_per_node - 1) // cores_per_node  # Ceiling division
-        
-        tasks_per_node = min(processes, cores_per_node)
         omp_threads = parallel_settings.get("omp_threads", 1)
+        
+        # Calculate total cores needed
+        total_cores_needed = processes * omp_threads
+        
+        # Calculate minimum nodes needed
+        min_nodes_needed = (total_cores_needed + cores_per_node - 1) // cores_per_node
+        nodes = max(min_nodes_needed, nodes if nodes is not None else min_nodes_needed)
+        
+        # Adjust tasks per node to not exceed cores_per_node
+        max_tasks_per_node = cores_per_node // omp_threads
+        tasks_per_node = min(processes // nodes, max_tasks_per_node)
+        if tasks_per_node == 0:
+            raise ValueError(f"Configuration requires too many cores per task. "
+                           f"Each task needs {omp_threads} cores, but only {cores_per_node} cores available per node.")
+        
+        # Ensure we have enough nodes to accommodate all processes
+        nodes = (processes + tasks_per_node - 1) // tasks_per_node
         
         executable_path = config.get("executable_path", "")
         problem_instance = config.get("problem_instance", "")
         tracing = config.get("tracing", False)
         
-        # Calculate total cores and memory
-        total_cores = processes * omp_threads
+        # Calculate memory requirements (4GB per core as before)
         mem_per_core = 4  # GB per core
-        total_mem = nodes * cores_per_node * mem_per_core  # Total memory in GB
+        mem_per_node = cores_per_node * mem_per_core  # Memory per node in GB
         
         # Generate Slurm script
         slurm_script_path = run_dir / "run.slurm"
@@ -457,13 +467,14 @@ echo "Build completed: {build_dir}/mcts_scheduler"
 #SBATCH --ntasks={processes}
 #SBATCH --ntasks-per-node={tasks_per_node}
 #SBATCH --cpus-per-task={omp_threads}
-#SBATCH --mem={total_mem}G
+#SBATCH --mem={mem_per_node}G
 #SBATCH --time={time_limit}
 
 echo "Starting job for run_id: {run_id}"
 echo "Timestamp: $(date)"
 echo "Nodes: {nodes}, Processes: {processes}, OMP Threads: {omp_threads}"
-echo "Cores per node: {cores_per_node}, Total cores: {total_cores}"
+echo "Tasks per node: {tasks_per_node}, Cores per node: {cores_per_node}"
+echo "Total cores requested: {total_cores_needed}"
 
 # Load necessary modules
 module purge
