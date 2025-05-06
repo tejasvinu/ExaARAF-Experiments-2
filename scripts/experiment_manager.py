@@ -81,7 +81,7 @@ class ExperimentManager:
         unique_suffix = uuid.uuid4().hex[:4]
         
         return f"{run_id}_{timestamp}_{unique_suffix}"
-      def setup_experiment(self, 
+    def setup_experiment(self, 
                          problem_instance: str,
                          mcts_settings: Dict[str, Any],
                          build_settings: Dict[str, Any],
@@ -584,7 +584,8 @@ def main():
                              choices=["O2", "O3", "O3xHost", "debug"],
                              help="Optimization level")
     setup_parser.add_argument("--processes", type=int, default=1,
-                             help="Number of MPI processes")    setup_parser.add_argument("--omp-threads", type=int, required=True, help="Number of OpenMP threads per process.")
+                             help="Number of MPI processes")    
+    setup_parser.add_argument("--omp-threads", type=int, required=True, help="Number of OpenMP threads per process.")
     setup_parser.add_argument("--tracing", action="store_true", help="Enable execution tracing.")
     setup_parser.add_argument("--nodes", type=int, default=1, help="Number of compute nodes to request.") # Added nodes argument
 
