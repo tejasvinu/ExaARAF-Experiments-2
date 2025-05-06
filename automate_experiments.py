@@ -200,92 +200,68 @@ def run_experiments(problem_instances, processes_list, omp_threads_list,
         # Set up experiment configs
         mcts_settings = {
             "simulations": simulations,
-            "exploration": 1.0  # Default exploration parameter
+            # Assuming exploration is a fixed value or needs to be added as an arg
+            "exploration": 1.414  
         }
         
         build_settings = {
             "parallelization": parallelization,
             "compiler": compiler,
-            "optimization": "O3xHost" if compiler == "oneapi" else "O3"
+            # Assuming optimization level needs mapping or direct use
+            "optimization": "O3xHost" if "-xHost" in COMPILERS[compiler]['flags'] else "O3" 
         }
         
         parallel_settings = {
             "processes": processes,
             "omp_threads": omp_threads
         }
-        
-        # Set up experiment
+
+        # Get the node count for this specific process configuration
+        nodes_for_run = nodes_dict.get(processes)
+        if nodes_for_run is None:
+             print(f"Warning: Could not determine node count for {processes} processes. Defaulting to auto-calculation.")
+             nodes_for_run = max(1, (processes + cores_per_node - 1) // cores_per_node)
+
+        # Setup experiment using ExperimentManager
         try:
             run_id = manager.setup_experiment(
                 problem_instance=problem,
                 mcts_settings=mcts_settings,
                 build_settings=build_settings,
                 parallel_settings=parallel_settings,
-                tracing=tracing
+                tracing=tracing,
+                nodes=nodes_for_run, # Pass nodes here
+                cores_per_node=cores_per_node
             )
-            
-            # Generate Slurm script with custom time limit and partition
+            run_ids.append(run_id)
+            print(f"  Set up experiment: {run_id}")
+
+            # Build executable (optional, could be done once per build config)
+            # For simplicity, let's assume build happens separately or is handled by setup
+            # manager.build_executable(run_id, build_settings, parallel_settings, tracing)
+
+            # Generate Slurm script
             slurm_script_path = manager.generate_slurm_script(
                 run_id=run_id,
                 parallel_settings=parallel_settings,
-                time_limit=time_limit
+                time_limit=time_limit,
+                cores_per_node=cores_per_node,
+                nodes=nodes_for_run # Pass nodes here
             )
-            
-            # Modify the slurm script to include the partition and nodes
-            run_dir = os.path.join(RESULTS_DIR, run_id)
-            slurm_script_path = os.path.join(run_dir, "run.slurm")
-            
-            with open(slurm_script_path, 'r') as f:
-                content = f.read()
-            
-            # Determine node count for this process count
-            nodes = nodes_dict.get(processes, max(1, (processes + cores_per_node - 1) // cores_per_node))
-            
-            # Add partition directive and update node count
-            content = content.replace(
-                "#SBATCH --nodes=", 
-                f"#SBATCH --nodes={nodes}"
-            )
-            
-            content = content.replace(
-                "#SBATCH --time=", 
-                f"#SBATCH --partition={partition}\n#SBATCH --time="
-            )
-            
-            with open(slurm_script_path, 'w') as f:
-                f.write(content)
-            
+            print(f"    Generated Slurm script: {slurm_script_path}")
+
             # Submit job
-            try:
-                stdout, _ = run_command(['sbatch', slurm_script_path], cwd=run_dir)
-                match = re.search(r'Submitted batch job (\d+)', stdout)
-                if match:
-                    job_id = match.group(1)
-                    job_ids.append(job_id)
-                    run_ids.append(run_id)
-                    
-                    # Update config with job ID
-                    config_path = os.path.join(run_dir, "run_config.json")
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                    
-                    config["slurm_job_id"] = job_id
-                    config["nodes"] = nodes  # Save node count in config
-                    
-                    with open(config_path, 'w') as f:
-                        json.dump(config, f, indent=2)
-                    
-                    print(f"Submitted job {job_id} for run_id: {run_id} ({nodes} node(s), {processes} processes)")
-                else:
-                    print(f"Warning: Could not parse job ID from sbatch output for {run_id}.")
-                    print("Output:", stdout)
-            except Exception as e:
-                print(f"Error submitting job for {run_id}: {e}")
-                
+            job_id = manager.submit_job(run_id)
+            if job_id:
+                job_ids.append(job_id)
+                print(f"    Submitted job with ID: {job_id}")
+            else:
+                print(f"    Failed to submit job for {run_id}")
+
         except Exception as e:
-            print(f"Error setting up experiment for {problem_name}, {processes} processes: {e}")
-    
-    print(f"\nSubmitted {len(job_ids)} jobs.")
+            print(f"Error processing configuration: {problem_name}, {processes}p, {omp_threads}t, {compiler}")
+            print(f"  Error details: {e}")
+
     return job_ids, run_ids
 
 def wait_for_jobs(job_ids, check_interval=60, max_wait_time=None):

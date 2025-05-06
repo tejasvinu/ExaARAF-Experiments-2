@@ -71,6 +71,7 @@ python scripts/experiment_manager.py setup \
     --optimization O3xHost \
     --processes 32 \
     --omp-threads 4 \
+    --nodes 1 \
     --tracing
 ```
 
@@ -171,13 +172,14 @@ See [AUTOMATION.md](AUTOMATION.md) for detailed documentation on the automation 
 Example of running a scaling test with the automation tool:
 
 ```bash
-python automate_experiments.py --all \
-    --compilers gcc \
-    --problems problem_instances/sample_problem01.txt \
-    --processes 1 2 4 8 16 \
-    --omp-threads 1 2 4 \
-    --simulations 10000 \
-    --parallelization treeMPI
+python automate_experiments.py --all \\
+    --compilers gcc \\
+    --problems problem_instances/sample_problem01.txt \\
+    --processes 1 2 4 8 16 \\
+    --omp-threads 1 2 4 \\
+    --simulations 10000 \\
+    --parallelization treeMPI \\
+    --nodes auto # Example using automatic node calculation
 ```
 
 This will automatically:
@@ -200,13 +202,24 @@ To run multi-node scaling experiments, use the `--nodes` parameter with the auto
 
 ```bash
 # Example of multi-node scaling experiment with explicit node allocation
-python automate_experiments.py --build --run --parse --plot \
-    --compilers gcc \
-    --processes 16 32 64 128 256 \
-    --omp-threads 2 \
-    --simulations 50000 \
-    --parallelization treeMPI \
-    --nodes 1 1 2 4 8
+# Ensure the number of node counts matches the number of process counts
+python automate_experiments.py --build --run --parse --plot \\
+    --compilers gcc \\
+    --processes 16 32 64 128 256 \\
+    --omp-threads 2 \\
+    --simulations 50000 \\
+    --parallelization treeMPI \\
+    --nodes 1 1 2 4 8 # 5 process counts, 5 node counts
+
+# Example using automatic node calculation based on cores_per_node
+python automate_experiments.py --build --run --parse --plot \\
+    --compilers gcc \\
+    --processes 16 32 64 128 256 \\
+    --omp-threads 2 \\
+    --simulations 50000 \\
+    --parallelization treeMPI \\
+    --nodes auto \\
+    --cores-per-node 40
 
 # Using the helper script for multi-node tests
 ./run_experiments.sh  # Then select option 8 for multi-node scaling test

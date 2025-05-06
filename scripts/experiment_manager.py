@@ -81,13 +81,14 @@ class ExperimentManager:
         unique_suffix = uuid.uuid4().hex[:4]
         
         return f"{run_id}_{timestamp}_{unique_suffix}"
-    
-    def setup_experiment(self, 
+      def setup_experiment(self, 
                          problem_instance: str,
                          mcts_settings: Dict[str, Any],
                          build_settings: Dict[str, Any],
                          parallel_settings: Dict[str, Any],
-                         tracing: bool = False) -> str:
+                         tracing: bool = False,
+                         nodes: Optional[int] = None,
+                         cores_per_node: int = 40) -> str:
         """
         Set up a new experiment with the given parameters.
         
@@ -97,6 +98,8 @@ class ExperimentManager:
             build_settings: Compiler and build settings
             parallel_settings: MPI and OpenMP settings
             tracing: Whether to enable tracing
+            nodes: Number of nodes to request in job submission
+            cores_per_node: Number of CPU cores per compute node
             
         Returns:
             The generated run ID
@@ -581,13 +584,20 @@ def main():
                              choices=["O2", "O3", "O3xHost", "debug"],
                              help="Optimization level")
     setup_parser.add_argument("--processes", type=int, default=1,
-                             help="Number of MPI processes")
-    setup_parser.add_argument("--omp-threads", type=int, default=1,
-                             help="Number of OpenMP threads per process")
-    setup_parser.add_argument("--tracing", action="store_true",
-                             help="Enable execution tracing")
-    setup_parser.add_argument("--exploration", type=float, default=1.0,
-                             help="MCTS exploration parameter (UCT C value)")
+                             help="Number of MPI processes")    setup_parser.add_argument("--omp-threads", type=int, required=True, help="Number of OpenMP threads per process.")
+    setup_parser.add_argument("--tracing", action="store_true", help="Enable execution tracing.")
+    setup_parser.add_argument("--nodes", type=int, default=1, help="Number of compute nodes to request.") # Added nodes argument
+
+    # --- Generate Slurm Script Subcommand ---
+    slurm_parser = subparsers.add_parser("generate-slurm", help="Generate Slurm script for an experiment")
+    slurm_parser.add_argument("--run-id", type=str, required=True,
+                             help="Run ID of the experiment")
+    slurm_parser.add_argument("--time-limit", type=str, default="01:00:00",
+                             help="Job time limit in HH:MM:SS format")
+    slurm_parser.add_argument("--nodes", type=int, default=None,
+                             help="Number of nodes to request (overrides automatic calculation)")
+    slurm_parser.add_argument("--cores-per-node", type=int, default=40,
+                             help="Number of CPU cores per compute node")
     
     # Build command
     build_parser = subparsers.add_parser("build", help="Build executable for an experiment")

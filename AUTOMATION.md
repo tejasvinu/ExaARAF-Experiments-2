@@ -63,30 +63,33 @@ python automate_experiments.py --build --run --parse --plot \
 
 ```bash
 # Multi-node scaling test with automatic node allocation
-python automate_experiments.py --build --run --parse --plot \
-    --compilers gcc \
-    --problems problem_instances/sample_problem01.txt \
-    --processes 16 32 64 128 256 \
-    --omp-threads 1 2 \
-    --simulations 50000 \
-    --parallelization treeMPI \
-    --nodes auto
+# The script calculates nodes needed based on processes and cores-per-node
+python automate_experiments.py --build --run --parse --plot \\
+    --compilers gcc \\
+    --problems problem_instances/sample_problem01.txt \\
+    --processes 16 32 64 128 256 \\
+    --omp-threads 1 2 \\
+    --simulations 50000 \\
+    --parallelization treeMPI \\
+    --nodes auto \\
+    --cores-per-node 40 # Needed for 'auto' calculation
 
 # Multi-node scaling test with explicit node allocation
-python automate_experiments.py --build --run --parse --plot \
-    --compilers gcc \
-    --problems problem_instances/sample_problem01.txt \
-    --processes 16 32 64 128 256 \
-    --omp-threads 1 \
-    --simulations 50000 \
-    --parallelization treeMPI \
-    --nodes 1 1 2 4 8 \
+# The number of items in --nodes must match the number of items in --processes
+python automate_experiments.py --build --run --parse --plot \\
+    --compilers gcc \\
+    --problems problem_instances/sample_problem01.txt \\
+    --processes 16 32 64 128 256 \\ # 5 process counts
+    --omp-threads 1 \\
+    --simulations 50000 \\
+    --parallelization treeMPI \\
+    --nodes 1 1 2 4 8 \\ # 5 node counts
     --cores-per-node 40
 ```
 
 The `--nodes` parameter can be used in two ways:
-1. Setting it to `auto` will automatically calculate the appropriate number of nodes based on process count and the specified cores-per-node.
-2. Providing a list of node counts that corresponds to the process counts specified. For example, if `--processes 16 32 64` is specified, then `--nodes 1 1 2` would allocate 1 node for 16 processes, 1 node for 32 processes, and 2 nodes for 64 processes.
+1. Setting it to `auto` (or omitting it, as 'auto' is the default) will automatically calculate the appropriate number of nodes based on each process count in `--processes` and the value of `--cores-per-node`.
+2. Providing a list of specific node counts. **The number of node counts provided must exactly match the number of process counts specified with `--processes`**. For example, if `--processes 16 32 64` is specified, then `--nodes 1 1 2` would allocate 1 node for 16 processes, 1 node for 32 processes, and 2 nodes for 64 processes. If the counts don't match, the script will issue a warning and attempt to use auto-calculation for missing values.
 
 ## Command-Line Options
 
@@ -107,8 +110,8 @@ The `automate_experiments.py` script supports the following options:
 - `--omp-threads`: OpenMP threads per process to test
 - `--simulations`: MCTS simulation counts to test
 - `--parallelization`: Parallelization strategy (treeMPI, rootMPI)
-- `--nodes`: Number of nodes to use for each process count ('auto' or specific counts)
-- `--cores-per-node`: Number of CPU cores per compute node
+- `--nodes`: Number of nodes to use for each process count. Default is ['auto']. Provide 'auto' for automatic calculation based on `--cores-per-node`, or provide a list of specific integer counts matching the number of entries in `--processes`.
+- `--cores-per-node`: Number of CPU cores per compute node (default: 40). Used for 'auto' node calculation.
 - `--tracing`: Enable execution tracing
 
 ### Job Control Options
@@ -140,6 +143,7 @@ The parsed results are saved in `mcts_experiment_results.csv` with the following
 - `simulations`: Number of MCTS simulations
 - `parallelization`: Parallelization strategy
 - `compiler`: Compiler used
+- `nodes`: Number of nodes requested for the run
 - `makespan`: Resulting schedule makespan
 - `execution_time`: Total execution time in seconds
 - `mcts_nodes`: Number of MCTS nodes explored
