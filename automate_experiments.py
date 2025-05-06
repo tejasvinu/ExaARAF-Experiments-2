@@ -52,7 +52,7 @@ SOURCE_DIR = "src/mcts"
 SOURCE_FILE = "main.cpp"
 EXECUTABLE_BASE = "mcts_scheduler"
 RESULTS_DIR = "experiment_results"
-CLUSTER_PARTITION = "cpu"  # Partition for Slurm
+CLUSTER_PARTITION = "standard"  # Partition for Slurm
 MAX_JOB_TIME = "01:00:00"  # Default max time for each job
 
 # --- Helper Functions ---

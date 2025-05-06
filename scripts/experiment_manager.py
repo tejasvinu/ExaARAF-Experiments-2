@@ -554,6 +554,8 @@ echo "Results written to {run_dir}/solution.json"
             
         except subprocess.SubprocessError as e:
             print(f"Error submitting job: {e}")
+            if hasattr(e, 'stderr') and e.stderr:
+                print(f"sbatch stderr:\n{e.stderr}")
             return None
 
 
