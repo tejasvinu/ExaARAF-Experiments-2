@@ -178,6 +178,29 @@ For each experiment run, the following information is collected:
 - Slurm workload manager
 - Optional: Intel Trace Analyzer or Score-P for tracing
 
+### Required Environment Modules
+
+The build system expects the following modules to be available:
+- `gnu8/8.3.0` or compatible GCC compiler
+- `openmpi/4.1.1` or compatible OpenMPI installation
+- `oneapi/mpi/latest` (required only when using Intel compilers)
+
+The build script will automatically load these modules. If your system has different module names, you may need to modify the module load commands in `scripts/experiment_manager.py`.
+
+### Manual Environment Setup
+
+If you need to set up the environment manually (e.g., for development or debugging), load the required modules:
+
+```bash
+# For GCC + OpenMPI builds:
+module purge
+module load gnu8/8.3.0
+module load openmpi/4.1.1
+
+# For Intel builds, also load:
+module load oneapi/mpi/latest
+```
+
 ## Experiment Automation
 
 For automated experiment workflows including scaling tests and performance analysis, we provide several automation tools:

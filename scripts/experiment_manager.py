@@ -337,6 +337,13 @@ echo "Monitoring finished"
         """
         run_dir = self.experiment_results_dir / run_id
         
+        # Load configuration to get MCTS settings
+        config_path = run_dir / "run_config.json"
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        mcts_settings = config.get("mcts_settings", {})
+        
         # Define compiler flags
         compiler = build_settings.get("compiler", "gcc")
         optimization = build_settings.get("optimization", "O3")
@@ -380,17 +387,49 @@ echo "Monitoring finished"
         build_script_content = f"""#!/bin/bash
 set -e
 
-# Load MPI module for build
-module purge
-module load openmpi/4.1.1
+# Initialize module system
+if [ -n "${{LMOD_CMD:-}}" ]; then
+    echo "Initializing Lmod via LMOD_CMD: ${{LMOD_CMD}}"
+    eval "$($LMOD_CMD bash)"
+elif [ -f /share/lmod/lmod/init/bash ]; then
+    echo 'Sourcing /share/lmod/lmod/init/bash'
+    . /share/lmod/lmod/init/bash
+elif [ -f /apps/lmod/lmod/init/bash ]; then
+    echo 'Sourcing /apps/lmod/lmod/init/bash'
+    . /apps/lmod/lmod/init/bash
+elif [ -f /ohpc/admin/lmod/lmod/init/bash ]; then
+    echo 'Sourcing /ohpc/admin/lmod/lmod/init/bash'
+    . /ohpc/admin/lmod/lmod/init/bash
+elif [ -f /profile.d/modules.sh ]; then
+    echo 'Sourcing /profile.d/modules.sh'
+    . /profile.d/modules.sh
+else
+    echo 'WARNING: Standard module system initialization not found. Module commands might fail.'
+fi
+
+# Load required modules
+module purge  # Start with a clean environment
+module load gnu8/8.3.0
+module load openmpi/4.1.4  # Updated to match available version
+{f'module load oneapi/mpi/latest' if compiler in ['icc', 'oneapi'] else ''}
+
+# Debug information
+echo 'Effective PATH: '$PATH
+echo 'Effective LD_LIBRARY_PATH: '$LD_LIBRARY_PATH
+echo -n 'Which mpicxx: '
+which mpicxx || echo 'mpicxx not found by which'
+echo -n 'command -v mpicxx: '
+command -v mpicxx || echo 'mpicxx not found by command -v'
 
 # Build MCTS executable with {compiler} and {optimization}
-{compiler_cmd} {opt_flags} {omp_flag} {trace_flags} \
-    -DMCTS_SIMULATIONS={parallel_settings.get('simulations', 10000)} \
-    -DMCTS_PARALLELIZATION="{build_settings.get('parallelization', 'treeMPI')}" \
-    -DMCTS_OMP_THREADS={omp_threads} \
-    -I{self.src_dir}/mcts \
-    {self.src_dir}/mcts/main.cpp \
+echo "Executing compile command: {compiler_cmd} {opt_flags} {omp_flag} {trace_flags} -DMCTS_SIMULATIONS={mcts_settings.get('simulations', 10000)} -DMCTS_PARALLELIZATION=\\"{build_settings.get('parallelization', 'treeMPI')}\\" -DMCTS_OMP_THREADS={omp_threads}"
+
+{compiler_cmd} {opt_flags} {omp_flag} {trace_flags} \\
+    -DMCTS_SIMULATIONS={mcts_settings.get('simulations', 10000)} \\
+    -DMCTS_PARALLELIZATION="{build_settings.get('parallelization', 'treeMPI')}" \\
+    -DMCTS_OMP_THREADS={omp_threads} \\
+    -I{self.src_dir}/mcts \\
+    {self.src_dir}/mcts/main.cpp \\
     -o {build_dir}/mcts_scheduler
 
 echo "Build completed: {build_dir}/mcts_scheduler"
