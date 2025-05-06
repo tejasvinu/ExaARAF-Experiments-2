@@ -64,32 +64,41 @@ python automate_experiments.py --build --run --parse --plot \
 ```bash
 # Multi-node scaling test with automatic node allocation
 # The script calculates nodes needed based on processes and cores-per-node
-python automate_experiments.py --build --run --parse --plot \\
-    --compilers gcc \\
-    --problems problem_instances/sample_problem01.txt \\
-    --processes 16 32 64 128 256 \\
-    --omp-threads 1 2 \\
-    --simulations 50000 \\
-    --parallelization treeMPI \\
-    --nodes auto \\
-    --cores-per-node 40 # Needed for 'auto' calculation
+python automate_experiments.py --build --run --parse --plot \
+    --compilers gcc \
+    --problems problem_instances/sample_problem01.txt \
+    --processes 16 32 64 128 256 \
+    --omp-threads 1 2 \
+    --simulations 50000 \
+    --parallelization treeMPI \
+    --nodes auto \
+    --cores-per-node 48  # Using 48-core node configuration
 
 # Multi-node scaling test with explicit node allocation
 # The number of items in --nodes must match the number of items in --processes
-python automate_experiments.py --build --run --parse --plot \\
-    --compilers gcc \\
-    --problems problem_instances/sample_problem01.txt \\
-    --processes 16 32 64 128 256 \\ # 5 process counts
-    --omp-threads 1 \\
-    --simulations 50000 \\
-    --parallelization treeMPI \\
-    --nodes 1 1 2 4 8 \\ # 5 node counts
-    --cores-per-node 40
+python automate_experiments.py --build --run --parse --plot \
+    --compilers gcc \
+    --problems problem_instances/sample_problem01.txt \
+    --processes 48 96 192 384 768 \ # Process counts aligned with 48-core nodes
+    --omp-threads 1 \
+    --simulations 50000 \
+    --parallelization treeMPI \
+    --nodes 1 2 4 8 16 \ # Node counts matched to process counts
+    --cores-per-node 48
 ```
 
 The `--nodes` parameter can be used in two ways:
-1. Setting it to `auto` (or omitting it, as 'auto' is the default) will automatically calculate the appropriate number of nodes based on each process count in `--processes` and the value of `--cores-per-node`.
-2. Providing a list of specific node counts. **The number of node counts provided must exactly match the number of process counts specified with `--processes`**. For example, if `--processes 16 32 64` is specified, then `--nodes 1 1 2` would allocate 1 node for 16 processes, 1 node for 32 processes, and 2 nodes for 64 processes. If the counts don't match, the script will issue a warning and attempt to use auto-calculation for missing values.
+1. Setting it to `auto` (or omitting it, as 'auto' is the default) will automatically calculate the appropriate number of nodes based on each process count in `--processes` and the value of `--cores-per-node`. The calculation ensures optimal resource utilization based on the available 48 cores per node.
+
+2. Providing a list of specific node counts. **The number of node counts provided must exactly match the number of process counts specified with `--processes`**. 
+
+Examples of automatic node calculation with 48 cores per node:
+- 48 processes × 1 thread = 48 cores (1 node)
+- 96 processes × 1 thread = 96 cores (2 nodes)
+- 48 processes × 2 threads = 96 cores (2 nodes)
+- 192 processes × 1 thread = 192 cores (4 nodes)
+
+Note: When using OpenMP threads (--omp-threads > 1), the total core requirement is calculated as: processes × threads. Make sure this total doesn't exceed the available cores (nodes × cores-per-node).
 
 ## Command-Line Options
 

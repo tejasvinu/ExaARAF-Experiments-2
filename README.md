@@ -73,7 +73,7 @@ python scripts/experiment_manager.py setup \\
     --processes 32 \\
     --omp-threads 4 \\
     --nodes 1 \\
-    --cores-per-node 40 \\ # Added cores-per-node
+    --cores-per-node 48 \\ # Default configuration for 48-core nodes
     --tracing
 ```
 
@@ -82,6 +82,20 @@ This will:
 2. Create a directory under `experiment_results/`
 3. Create a configuration file with all parameters
 4. Prepare the monitoring script
+
+### Resource Allocation
+
+The experiment manager automatically handles resource allocation based on the following parameters:
+- `--cores-per-node`: Number of CPU cores available on each node (default: 48)
+- `--processes`: Number of MPI processes to launch
+- `--omp-threads`: Number of OpenMP threads per process
+- `--nodes`: Number of nodes to use (or 'auto' for automatic calculation)
+
+The system will automatically calculate the optimal node allocation based on your process and thread configuration. For example:
+- With 48 cores per node:
+  - 32 processes × 1 thread = 32 cores (fits on 1 node)
+  - 32 processes × 2 threads = 64 cores (needs 2 nodes)
+  - 96 processes × 1 thread = 96 cores (needs 2 nodes)
 
 ### Building the Executable
 
