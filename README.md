@@ -63,17 +63,17 @@ Where:
 ### Setting Up an Experiment
 
 ```bash
-python scripts/experiment_manager.py setup \\
-    --problem problem_instances/sample_problem01.txt \\
-    --simulations 50000 \\
-    --exploration 1.414 \\
-    --parallelization treeMPI \\
-    --compiler oneapi \\
-    --optimization O3xHost \\
-    --processes 32 \\
-    --omp-threads 4 \\
-    --nodes 1 \\
-    --cores-per-node 48 \\ # Default configuration for 48-core nodes
+python scripts/experiment_manager.py setup \
+    --problem problem_instances/sample_problem01.txt \
+    --simulations 50000 \
+    --exploration 1.414 \
+    --parallelization treeMPI \
+    --compiler oneapi \
+    --optimization O3xHost \
+    --processes 32 \
+    --omp-threads 4 \
+    --nodes 1 \
+    --cores-per-node 48 \
     --tracing
 ```
 

@@ -15,6 +15,7 @@ import subprocess
 import datetime
 import argparse
 import shutil
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -81,6 +82,7 @@ class ExperimentManager:
         unique_suffix = uuid.uuid4().hex[:4]
         
         return f"{run_id}_{timestamp}_{unique_suffix}"
+
     def setup_experiment(self, 
                          problem_instance: str,
                          mcts_settings: Dict[str, Any],
@@ -88,7 +90,7 @@ class ExperimentManager:
                          parallel_settings: Dict[str, Any],
                          tracing: bool = False,
                          nodes: Optional[int] = None,
-                         cores_per_node: int = 40) -> str:
+                         cores_per_node: int = 48) -> str:
         """
         Set up a new experiment with the given parameters.
         
@@ -111,6 +113,15 @@ class ExperimentManager:
         optimization = build_settings.get("optimization", "O3")
         processes = parallel_settings.get("processes", 1)
         omp_threads = parallel_settings.get("omp_threads", 1)
+        
+        # Validate resource requirements
+        total_cores_needed = processes * omp_threads
+        min_nodes_needed = (total_cores_needed + cores_per_node - 1) // cores_per_node
+        
+        if nodes is not None and nodes < min_nodes_needed:
+            print(f"WARNING: Requested {nodes} nodes but at least {min_nodes_needed} needed for {processes} processes with {omp_threads} threads each.")
+            print(f"Setting nodes to {min_nodes_needed}.")
+            nodes = min_nodes_needed
         
         # Generate run ID
         run_id = self.generate_run_id(
@@ -438,16 +449,35 @@ echo "Build completed: {build_dir}/mcts_scheduler"
         # Calculate minimum nodes needed
         min_nodes_needed = (total_cores_needed + cores_per_node - 1) // cores_per_node
         nodes = max(min_nodes_needed, nodes if nodes is not None else min_nodes_needed)
-        
-        # Adjust tasks per node to not exceed cores_per_node
+          # Adjust tasks per node to not exceed cores_per_node
         max_tasks_per_node = cores_per_node // omp_threads
-        tasks_per_node = min(processes // nodes, max_tasks_per_node)
-        if tasks_per_node == 0:
-            raise ValueError(f"Configuration requires too many cores per task. "
-                           f"Each task needs {omp_threads} cores, but only {cores_per_node} cores available per node.")
         
-        # Ensure we have enough nodes to accommodate all processes
-        nodes = (processes + tasks_per_node - 1) // tasks_per_node
+        # Verify that the requested configuration is possible with the available cores
+        if max_tasks_per_node == 0:
+            raise ValueError(f"Configuration requires too many cores per task. "
+                           f"Each task needs {omp_threads} threads, but only {cores_per_node} cores available per node.")
+        
+        # Calculate how many nodes we need based on the core requirements
+        min_nodes_needed = (processes + max_tasks_per_node - 1) // max_tasks_per_node
+        nodes = max(min_nodes_needed, nodes if nodes is not None else min_nodes_needed)
+
+        # Calculate tasks per node based on the number of nodes we'll use
+        tasks_per_node = min(max_tasks_per_node, (processes + nodes - 1) // nodes)
+
+        # Ensure we never request more cores per node than available
+        if tasks_per_node * omp_threads > cores_per_node:
+            # Reduce tasks_per_node to fit within core limit
+            tasks_per_node = cores_per_node // omp_threads
+            if tasks_per_node == 0:
+                raise ValueError(f"Invalid configuration: Each task needs {omp_threads} threads, but only {cores_per_node} cores available per node.")
+            # Recalculate nodes needed with new tasks_per_node
+            min_nodes_needed = (processes + tasks_per_node - 1) // tasks_per_node
+            nodes = max(min_nodes_needed, nodes)
+
+        # Final validation
+        if tasks_per_node * omp_threads > cores_per_node:
+            raise ValueError(f"Invalid configuration: {tasks_per_node} tasks × {omp_threads} threads = {tasks_per_node * omp_threads} cores, "
+                           f"but only {cores_per_node} cores available per node.")
         
         executable_path = config.get("executable_path", "")
         problem_instance = config.get("problem_instance", "")
@@ -456,9 +486,19 @@ echo "Build completed: {build_dir}/mcts_scheduler"
         # Calculate memory requirements (4GB per core as before)
         mem_per_core = 4  # GB per core
         mem_per_node = cores_per_node * mem_per_core  # Memory per node in GB
-        
-        # Generate Slurm script
+          # Generate Slurm script
         slurm_script_path = run_dir / "run.slurm"
+        
+        # Do a final validation of resource requests
+        cores_per_task = omp_threads  # cpus-per-task is the OMP threads
+        total_cores_requested = processes * cores_per_task
+        total_cores_available = nodes * cores_per_node
+        
+        if total_cores_requested > total_cores_available:
+            print(f"WARNING: You're requesting more cores ({total_cores_requested}) than available "
+                  f"on {nodes} nodes with {cores_per_node} cores each ({total_cores_available} cores total).")
+            print(f"This may cause job submission failures or poor performance.")
+        
         slurm_script_content = f"""#!/bin/bash
 #SBATCH --job-name=mcts_{run_id}
 #SBATCH --output={run_dir}/job_output.log
@@ -517,7 +557,6 @@ echo "Results written to {run_dir}/solution.json"
             f.write(slurm_script_content)
         
         return str(slurm_script_path)
-    
     def submit_job(self, run_id: str) -> Optional[str]:
         """
         Submit a job to the Slurm scheduler.
@@ -538,6 +577,7 @@ echo "Results written to {run_dir}/solution.json"
         
         # Submit job
         try:
+            print(f"Submitting job with sbatch {slurm_script_path}")
             result = subprocess.run(
                 ["sbatch", str(slurm_script_path)],
                 stdout=subprocess.PIPE,
@@ -567,6 +607,43 @@ echo "Results written to {run_dir}/solution.json"
             print(f"Error submitting job: {e}")
             if hasattr(e, 'stderr') and e.stderr:
                 print(f"sbatch stderr:\n{e.stderr}")
+                
+            # Provide helpful info when the error is likely resource-related
+            if "not enough" in str(e).lower() or "insufficient" in str(e).lower():
+                # Read the slurm script to get the resource requests
+                with open(slurm_script_path, 'r') as f:
+                    script_content = f.read()
+                
+                try:
+                    # Parse nodes and cpus-per-task
+                    nodes_match = re.search(r'#SBATCH --nodes=(\d+)', script_content)
+                    tasks_match = re.search(r'#SBATCH --ntasks=(\d+)', script_content)
+                    tasks_per_node_match = re.search(r'#SBATCH --ntasks-per-node=(\d+)', script_content)
+                    cpus_per_task_match = re.search(r'#SBATCH --cpus-per-task=(\d+)', script_content)
+                    
+                    if nodes_match and tasks_match and cpus_per_task_match:
+                        nodes = int(nodes_match.group(1))
+                        tasks = int(tasks_match.group(1))
+                        cpus_per_task = int(cpus_per_task_match.group(1))
+                        tasks_per_node = int(tasks_per_node_match.group(1)) if tasks_per_node_match else tasks // nodes
+                        
+                        print(f"\nResource allocation summary:")
+                        print(f"  Nodes: {nodes}")
+                        print(f"  Tasks (MPI processes): {tasks}")
+                        print(f"  Tasks per node: {tasks_per_node}")
+                        print(f"  CPUs per task (OMP threads): {cpus_per_task}")
+                        print(f"  Total cores requested: {tasks * cpus_per_task}")
+                        print(f"  Cores per node required: {tasks_per_node * cpus_per_task}")
+                        
+                        print("\nPossible solutions:")
+                        print("1. Reduce the number of MPI processes (--processes)")
+                        print("2. Reduce the number of OpenMP threads (--omp-threads)")
+                        print("3. Increase the number of nodes (--nodes)")
+                        print("4. Choose a partition with more cores per node")
+                except Exception:
+                    # If we couldn't parse the script, just skip the extra info
+                    pass
+                
             return None
 
 
