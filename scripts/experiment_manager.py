@@ -380,13 +380,17 @@ echo "Monitoring finished"
         build_script_content = f"""#!/bin/bash
 set -e
 
+# Load MPI module for build
+module purge
+module load openmpi/4.1.1
+
 # Build MCTS executable with {compiler} and {optimization}
-{compiler_cmd} {opt_flags} {omp_flag} {trace_flags} \\
-    -DMCTS_SIMULATIONS={parallel_settings.get('simulations', 10000)} \\
-    -DMCTS_PARALLELIZATION="{build_settings.get('parallelization', 'treeMPI')}" \\
-    -DMCTS_OMP_THREADS={omp_threads} \\
-    -I{self.src_dir}/mcts \\
-    {self.src_dir}/mcts/main.cpp \\
+{compiler_cmd} {opt_flags} {omp_flag} {trace_flags} \
+    -DMCTS_SIMULATIONS={parallel_settings.get('simulations', 10000)} \
+    -DMCTS_PARALLELIZATION="{build_settings.get('parallelization', 'treeMPI')}" \
+    -DMCTS_OMP_THREADS={omp_threads} \
+    -I{self.src_dir}/mcts \
+    {self.src_dir}/mcts/main.cpp \
     -o {build_dir}/mcts_scheduler
 
 echo "Build completed: {build_dir}/mcts_scheduler"
