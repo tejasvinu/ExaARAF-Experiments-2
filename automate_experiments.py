@@ -76,6 +76,7 @@ def generate_bash_script(commands, filename="temp_script.sh"):
     with open(filename, "w") as f:
         f.write("#!/bin/bash\n")
         f.write("set -e\n")  # Exit on error
+        f.write("source /etc/profile\n")  # Initialize environment for module command
         for cmd_list in commands:
             # Properly quote arguments for the shell script
             quoted_cmd = [f"'{arg}'" if ' ' in arg else arg for arg in cmd_list]
