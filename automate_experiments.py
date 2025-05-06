@@ -59,9 +59,17 @@ MAX_JOB_TIME = "01:00:00"  # Default max time for each job
 
 def run_command(command, cwd=None, env=None):
     """Runs a shell command and returns output."""
-    print(f"Running: {' '.join(command)}")
+    # Make a copy to modify if necessary
+    processed_command = list(command)
+    # If the command is to run a bash script, e.g., ['bash', 'script.sh'],
+    # execute it as a login shell to ensure proper environment initialization (e.g., for modules).
+    if processed_command[0] == 'bash' and len(processed_command) == 2 and \
+       not processed_command[1].startswith('-') and processed_command[1].endswith('.sh'):
+        processed_command.insert(1, '-l')
+
+    print(f"Running: {' '.join(processed_command)}")
     try:
-        result = subprocess.run(command, cwd=cwd, env=env, text=True,
+        result = subprocess.run(processed_command, cwd=cwd, env=env, text=True,
                                capture_output=True, check=True)
         return result.stdout, result.stderr
     except subprocess.CalledProcessError as e:
