@@ -80,15 +80,49 @@ def run_command(command, cwd=None, env=None):
         raise  # Re-raise the exception
 
 def generate_bash_script(commands, filename="temp_script.sh"):
-    """Generates a bash script file containing the given commands."""
+    """Generates a bash script file containing the given commands with enhanced debugging."""
     with open(filename, "w") as f:
-        f.write("#!/bin/bash\n")
-        f.write("set -e\n")  # Exit on error
-        f.write("source /etc/profile\n")  # Initialize environment for module command
+        f.write("#!/bin/bash\\n")
+        # set -e will exit on error, set -x will trace commands
+        f.write("set -ex\\n") 
+        
+        f.write("echo '--- Debug: Script Start ---' >&2\\n")
+        f.write("echo '--- Debug: Initial PATH ---' >&2\\n")
+        f.write("echo \"$PATH\" >&2\\n")
+        f.write("echo '--- Debug: Current User ---' >&2\\n")
+        f.write("whoami >&2\\n")
+        f.write("echo '--- Debug: Initial Environment Variables (env) ---' >&2\\n")
+        f.write("env >&2\\n")
+
+        f.write("echo '--- Debug: Attempting to source /etc/profile ---' >&2\\n")
+        # Try to source /etc/profile and report if it fails
+        f.write("source /etc/profile || echo 'WARNING: Failed to source /etc/profile (exit status $?)' >&2\\n")
+        f.write("echo '--- Debug: PATH after sourcing /etc/profile ---' >&2\\n")
+        f.write("echo \"$PATH\" >&2\\n")
+        f.write("echo '--- Debug: Environment Variables after sourcing /etc/profile ---' >&2\\n")
+        f.write("env >&2\\n")
+        
+        f.write("echo '--- Debug: Checking for module command availability ---' >&2\\n")
+        f.write("type module >&2 || echo 'WARNING: module command/function not found by type (exit status $?)' >&2\\n")
+        f.write("command -v module >&2 || echo 'WARNING: module command not found by command -v (exit status $?)' >&2\\n")
+        f.write("which module >&2 || echo 'WARNING: module command not found by which (exit status $?)' >&2\\n")
+
+        f.write("echo '--- Debug: Executing provided commands ---' >&2\\n")
         for cmd_list in commands:
             # Properly quote arguments for the shell script
             quoted_cmd = [f"'{arg}'" if ' ' in arg else arg for arg in cmd_list]
-            f.write(" ".join(quoted_cmd) + "\n")
+            command_str = " ".join(quoted_cmd)
+            
+            f.write(f"echo 'Debug: Executing: {command_str}' >&2\\n")
+            # Execute the command. If set -e is active, script will exit here on failure.
+            f.write(f"{command_str}\\n")
+            # This line will only be reached if the command_str succeeded or set -e is not active/triggered
+            f.write(f"echo 'Debug: Command [{command_str}] finished with status: $?' >&2\\n")
+
+        f.write("echo '--- Debug: Final PATH before script exit ---' >&2\\n")
+        f.write("echo \"$PATH\" >&2\\n")
+        f.write("echo '--- Debug: Bash script execution finished successfully ---' >&2\\n")
+        
     os.chmod(filename, 0o755)  # Make executable
     return filename
 
