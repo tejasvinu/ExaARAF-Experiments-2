@@ -406,7 +406,7 @@ echo "Build completed: {build_dir}/mcts_scheduler"
                              run_id: str, 
                              parallel_settings: Dict[str, Any],
                              time_limit: str = "01:00:00",
-                             cores_per_node: int = 40,
+                             cores_per_node: int = 48,  # Updated to 48 cores total
                              nodes: Optional[int] = None) -> str:
         """
         Generate a Slurm script for the experiment.
@@ -415,7 +415,7 @@ echo "Build completed: {build_dir}/mcts_scheduler"
             run_id: The experiment run ID
             parallel_settings: MPI and OpenMP settings
             time_limit: Job time limit in HH:MM:SS format
-            cores_per_node: Number of CPU cores per compute node
+            cores_per_node: Number of CPU cores per compute node (default 48 for 2×48)
             nodes: Explicit number of nodes to request (overrides automatic calculation)
             
         Returns:
@@ -586,23 +586,23 @@ def main():
                              help="Compiler to use")
     setup_parser.add_argument("--optimization", type=str, default="O3",
                              choices=["O2", "O3", "O3xHost", "debug"],
-                             help="Optimization level")
+                             help="Optimization level")    
     setup_parser.add_argument("--processes", type=int, default=1,
                              help="Number of MPI processes")    
     setup_parser.add_argument("--omp-threads", type=int, required=True, help="Number of OpenMP threads per process.")
-    setup_parser.add_argument("--tracing", action="store_true", help="Enable execution tracing.")
+    setup_parser.add_argument("--tracing", action="store_true", help="Enable execution tracing.")    
     setup_parser.add_argument("--nodes", type=int, default=1, help="Number of compute nodes to request.")
-    setup_parser.add_argument("--cores-per-node", type=int, default=40, help="Number of CPU cores per compute node.") # Added cores-per-node
+    setup_parser.add_argument("--cores-per-node", type=int, default=48, help="Number of CPU cores per compute node.")
 
     # --- Generate Slurm Script Subcommand ---
     slurm_parser = subparsers.add_parser("generate-slurm", help="Generate Slurm script for an experiment")
     slurm_parser.add_argument("--run-id", type=str, required=True,
-                             help="Run ID of the experiment")
+                             help="Run ID of the experiment")    
     slurm_parser.add_argument("--time-limit", type=str, default="01:00:00",
-                             help="Job time limit in HH:MM:SS format")
+                             help="Job time limit in HH:MM:SS format")    
     slurm_parser.add_argument("--nodes", type=int, default=None,
                              help="Number of nodes to request (overrides automatic calculation)")
-    slurm_parser.add_argument("--cores-per-node", type=int, default=40,
+    slurm_parser.add_argument("--cores-per-node", type=int, default=48,
                              help="Number of CPU cores per compute node")
     
     # Build command
@@ -611,15 +611,15 @@ def main():
                              help="Run ID of the experiment")
     
     # Submit command
-    submit_parser = subparsers.add_parser("submit", help="Submit job for an experiment")
+    submit_parser = subparsers.add_parser("submit", help="Submit job for an experiment")    
     submit_parser.add_argument("--run-id", type=str, required=True,
                              help="Run ID of the experiment")
     submit_parser.add_argument("--time-limit", type=str, default="01:00:00",
-                             help="Job time limit in HH:MM:SS format")
+                             help="Job time limit in HH:MM:SS format")    
     submit_parser.add_argument("--nodes", type=int, default=None,
-                             help="Number of nodes to request (overrides config)") # Added nodes
-    submit_parser.add_argument("--cores-per-node", type=int, default=40,
-                             help="Number of CPU cores per node (overrides config)") # Added cores-per-node
+                             help="Number of nodes to request (overrides config)")
+    submit_parser.add_argument("--cores-per-node", type=int, default=48,
+                             help="Number of CPU cores per node")
     
     # Parse arguments
     args = parser.parse_args()
