@@ -66,6 +66,7 @@ Where:
 python scripts/experiment_manager.py setup \
     --problem problem_instances/sample_problem01.txt \
     --simulations 50000 \
+    --exploration 1.414 \\ # Added exploration constant
     --parallelization treeMPI \
     --compiler oneapi \
     --optimization O3xHost \

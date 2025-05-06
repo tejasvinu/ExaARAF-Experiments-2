@@ -574,6 +574,8 @@ def main():
                              help="Path to problem instance file")
     setup_parser.add_argument("--simulations", type=int, default=10000,
                              help="Number of MCTS simulations")
+    setup_parser.add_argument("--exploration", type=float, default=1.414,
+                             help="MCTS exploration constant (e.g., for UCT).")
     setup_parser.add_argument("--parallelization", type=str, default="treeMPI",
                              choices=["treeMPI", "rootMPI", "hybrid"],
                              help="Parallelization strategy")
